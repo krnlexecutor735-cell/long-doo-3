@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/ldrs@1.0.2/dist/auto/chaoticOrbit.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        #loader-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #e9eef2;
+            display: flex; align-items: center; justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.5s ease;
+        }
+
+        #fade {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #e9eef2;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.35s ease;
+        }
+        #fade.in { opacity: 1; pointer-events: all; }
+
+        body {
+            margin: 0; background: #e9eef2;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; font-family: sans-serif;
+        }
+
+        .container {
+            position: relative;
+            background: white;
+            padding: 40px 50px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            width: 420px;
+            max-width: 90vw;
+        }
+
+        .q-text {
+            font-size: 19px;
+            font-weight: 700;
+            color: #222;
+            margin-bottom: 32px;
+            line-height: 1.5;
+        }
+
+        .options {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        input[type="radio"] { display: none; }
+
+        .label {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #444;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            user-select: none;
+            width: 100%;
+            height: 60px;
+            transition: color 0.25s;
+        }
+
+        .label::before {
+            content: '';
+            width: 28px; height: 28px;
+            border: 3px solid #ccc;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            transition: border-color 0.25s;
+        }
+
+        input:checked + .label::before { border-color: #1f6feb; }
+        input:checked + .label { color: #1f6feb; }
+
+        .worm {
+            position: absolute;
+            left: 7px;
+            width: 14px;
+            height: 14px;
+            background: #1f6feb;
+            border-radius: 20px;
+            transition: top 0.25s cubic-bezier(0.25,0.1,0.25,1),
+                        height 0.25s cubic-bezier(0.25,0.1,0.25,1);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .result-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 0;
+        }
+        .score-ring {
+            width: 120px; height: 120px;
+            border: 5px solid #1f6feb;
+            border-radius: 50%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+        .score-num { font-size: 38px; font-weight: 700; color: #1f6feb; line-height: 1; }
+        .score-of  { font-size: 15px; color: #bbb; }
+    </style>
+</head>
+<body>
+
+<div id="loader-overlay">
+    <l-chaotic-orbit size="50" speed="1.5" color="black"></l-chaotic-orbit>
+</div>
+
+<div id="fade">
+    <l-chaotic-orbit size="40" speed="1.5" color="black"></l-chaotic-orbit>
+</div>
+
+<div class="container" id="card"></div>
+
+<script>
+    // ตรวจเฉลยด้วยมือ:
+    // ข้อ1: 3(2x-5) - 4(x+1) = 2x-27  →  6x-15-4x-4 = 2x-27  →  2x-19 = 2x-27  ❌ ต้องแก้
+    // ข้อ1: (3x-1)/4 - (x+2)/3 = 1  →  3(3x-1)-4(x+2)=12  →  9x-3-4x-8=12  →  5x=23  ❌ ไม่ลงตัว
+    // ใช้โจทย์ที่ตรวจแล้ว:
+
+    // ข้อ1: 2(3x+1) - 3(x-4) = 5x+18  →  6x+2-3x+12=5x+18  →  3x+14=5x+18  →  -2x=4  →  x=-2  ✓ opts[-4,-2,0] ans=1
+    // ข้อ2: (5x-3)/2 = (3x+7)/4 + 3  →  2(5x-3)=3x+7+12  →  10x-6=3x+19  →  7x=25  ❌
+    // ข้อ2: 4(x-3)/3 = 2x-8  →  4x-12=6x-24  →  -2x=-12  →  x=6  ✓ opts[4,6,8] ans=1 (ไม่ดีเพราะอยู่กลาง)
+    // ข้อ2: x/2 - x/3 = x/4 + 1  →  6x-4x=3x+12  →  2x=3x+12  →  -x=12  →  x=-12  ✓
+    // ข้อ3: 5(2x+3) = 3(3x+7) + 2  →  10x+15=9x+21+2  →  x=8  ✓
+    // ข้อ4: (2x+5)(x-1)=2x²+3  →  2x²+3x-5=2x²+3  →  3x=8  ❌
+    // ข้อ4: 3x+1/5 = 2x-3  →  15x+1=10x-15  ❌ ต้องใช้วงเล็บชัดเจน
+    // ข้อ4: (3x+1)/5 = (x-1)/2  →  6x+2=5x-5  →  x=-7  ✓
+    // ข้อ5: 2x²-8=0 ไม่ใช่สมการเชิงเส้น skip
+    // ข้อ5: 0.5(6x-4) = 0.25(8x+12)  →  3x-2=2x+3  →  x=5  ✓
+
+    const questions = [
+        {
+            text: '2(3x + 1) − 3(x − 4) = 5x + 18',
+            opts: ['−4', '−2', '0'],
+            ans: 1   // x = -2
+        },
+        {
+            text: 'x/2 − x/3 = x/4 + 1',
+            opts: ['−12', '−6', '12'],
+            ans: 0   // x = -12
+        },
+        {
+            text: '5(2x + 3) = 3(3x + 7) + 2',
+            opts: ['6', '7', '8'],
+            ans: 2   // x = 8
+        },
+        {
+            text: '(3x + 1) / 5 = (x − 1) / 2',
+            opts: ['−9', '−7', '−5'],
+            ans: 1   // x = -7
+        },
+        {
+            text: '0.5(6x − 4) = 0.25(8x + 12)',
+            opts: ['3', '5', '7'],
+            ans: 1   // x = 5
+        },
+    ];
+
+    let userAnswers = new Array(questions.length).fill(null);
+    const fade = document.getElementById('fade');
+
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const ov = document.getElementById('loader-overlay');
+            ov.style.opacity = '0';
+            setTimeout(() => ov.style.display = 'none', 500);
+        }, 5000);
+    });
+
+    const ROW_H = 60;
+    const wormCenter = i => i * ROW_H + (ROW_H / 2) - 7;
+
+    function transition(cb) {
+        fade.classList.add('in');
+        setTimeout(() => {
+            cb();
+            setTimeout(() => fade.classList.remove('in'), 50);
+        }, 350);
+    }
+
+    function render(idx) {
+        const q    = questions[idx];
+        const card = document.getElementById('card');
+
+        card.innerHTML = `
+            <div class="q-text">${q.text}</div>
+            <div class="options" id="opts">
+                <div class="worm" id="worm"></div>
+                ${q.opts.map((o,i) => `
+                    <input type="radio" name="q" id="o${i}" value="${i}">
+                    <label for="o${i}" class="label">${o}</label>
+                `).join('')}
+            </div>
+        `;
+
+        const worm = document.getElementById('worm');
+        let wormY = wormCenter(0);
+        worm.style.top = wormY + 'px';
+
+        document.querySelectorAll('input[type="radio"]').forEach((r, i) => {
+            r.addEventListener('change', () => {
+                const targetY   = wormCenter(i);
+                const diff      = Math.abs(targetY - wormY);
+                const goingDown = targetY > wormY;
+
+                worm.style.height = (diff + 14) + 'px';
+                worm.style.top    = (goingDown ? wormY : targetY) + 'px';
+
+                setTimeout(() => {
+                    worm.style.height = '14px';
+                    worm.style.top    = targetY + 'px';
+                }, 120);
+
+                wormY = targetY;
+                userAnswers[idx] = i;
+
+                setTimeout(() => {
+                    transition(() => {
+                        if (idx < questions.length - 1) render(idx + 1);
+                        else showResult();
+                    });
+                }, 300);
+            });
+        });
+    }
+
+    function showResult() {
+        let score = 0;
+        userAnswers.forEach((a, i) => { if (a === questions[i].ans) score++; });
+
+        document.getElementById('card').innerHTML = `
+            <div class="result-wrap">
+                <div class="score-ring">
+                    <span class="score-num">${score}</span>
+                    <span class="score-of">/ ${questions.length}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    render(0);
+</script>
+</body>
+</html>
